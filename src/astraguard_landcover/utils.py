@@ -6,13 +6,17 @@ import json
 import os
 import random
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import torch
+
+if TYPE_CHECKING:
+    import torch
 
 
 def set_seed(seed: int) -> None:
+    import torch
+
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -21,7 +25,9 @@ def set_seed(seed: int) -> None:
     os.environ["PYTHONHASHSEED"] = str(seed)
 
 
-def select_device() -> torch.device:
+def select_device() -> "torch.device":
+    import torch
+
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -31,4 +37,3 @@ def write_json(path: str | Path, payload: Any) -> None:
     with output.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True, allow_nan=False)
         handle.write("\n")
-

@@ -1,0 +1,128 @@
+#!/bin/bash
+#PBS -N ag_landcover
+#PBS -q dgx
+#PBS -l select=1:ncpus=12:mem=64gb:ngpus=1
+#PBS -l walltime=24:00:00
+#PBS -j oe
+
+# One allocation performs preprocessing, training, and final evaluation.
+# HDF5 intermediates live only in PBS scratch; durable artifacts go to OUTPUT_DIR.
+
+set -euo pipefail
+
+cd "${PBS_O_WORKDIR}"
+
+PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
+DATA_ROOT="${DATA_ROOT:-$HOME/AstraGuard-LandClassifier-data}"
+RAW_DIR="${RAW_DIR:-${DATA_ROOT}/raw}"
+OUTPUT_DIR="${OUTPUT_DIR:-${DATA_ROOT}/runs}"
+CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
+CONFIG="${CONFIG:-configs/deeplabv3plus.yaml}"
+RUN_NAME="${RUN_NAME:-deeplabv3plus_v1}"
+RESUME="${RESUME:-${OUTPUT_DIR}/${RUN_NAME}/last.pt}"
+TILE_SIZE="${TILE_SIZE:-256}"
+STRIDE="${STRIDE:-256}"
+MIN_VALID_FRACTION="${MIN_VALID_FRACTION:-0.95}"
+JOB_TMPDIR="${TMPDIR:-/tmp/${USER}_${PBS_JOBID}}"
+PROCESSED_DIR="${JOB_TMPDIR}/astraguard-processed"
+RUN_DIR="${OUTPUT_DIR}/${RUN_NAME}"
+EVAL_DIR="${RUN_DIR}/test"
+
+mkdir -p "${PROCESSED_DIR}" "${RUN_DIR}/logs" "${EVAL_DIR}" "${CACHE_DIR}"
+LIVE_LOG="${RUN_DIR}/logs/pbs_${PBS_JOBID}.log"
+
+exec > >(tee -a "${LIVE_LOG}") 2>&1
+
+echo "AstraGuard preprocessing + training + evaluation"
+echo "Host: $(hostname)"
+echo "Started: $(date)"
+echo "PBS job: ${PBS_JOBID}"
+echo "Python: ${PYTHON_BIN}"
+echo "Raw data: ${RAW_DIR}"
+echo "Temporary processed data: ${PROCESSED_DIR}"
+echo "Persistent run output: ${RUN_DIR}"
+echo "Config: ${CONFIG}"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  echo "Python executable does not exist: ${PYTHON_BIN}"
+  exit 2
+fi
+if [[ ! -f "${CONFIG}" ]]; then
+  echo "Training config does not exist: ${CONFIG}"
+  exit 3
+fi
+for region_id in bhopal_train indore_val jabalpur_test; do
+  for required in image.tif worldcover.tif metadata.json; do
+    if [[ ! -f "${RAW_DIR}/${region_id}/${required}" ]]; then
+      echo "Required raw input does not exist: ${RAW_DIR}/${region_id}/${required}"
+      exit 4
+    fi
+  done
+done
+
+export HF_HOME="${CACHE_DIR}/huggingface"
+export TORCH_HOME="${CACHE_DIR}/torch"
+export HF_HUB_OFFLINE=1
+export TOKENIZERS_PARALLELISM=false
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-12}"
+
+nvidia-smi
+"${PYTHON_BIN}" -c \
+  'import torch; print("torch:", torch.__version__, "cuda:", torch.cuda.is_available(), "gpus:", torch.cuda.device_count())'
+
+echo
+echo "Stage 1/3: preprocessing raw rasters into PBS scratch"
+"${PYTHON_BIN}" -m astraguard_landcover.prepare_tiles \
+  --raw-dir "${RAW_DIR}" \
+  --output-dir "${PROCESSED_DIR}" \
+  --tile-size "${TILE_SIZE}" \
+  --stride "${STRIDE}" \
+  --min-valid-fraction "${MIN_VALID_FRACTION}"
+
+for required in train.h5 val.h5 test.h5 stats.json manifest.json; do
+  if [[ ! -f "${PROCESSED_DIR}/${required}" ]]; then
+    echo "Preprocessing did not create: ${PROCESSED_DIR}/${required}"
+    exit 5
+  fi
+done
+
+# Retain the small reproducibility metadata after PBS scratch is removed.
+cp "${PROCESSED_DIR}/stats.json" "${RUN_DIR}/dataset_stats.json"
+cp "${PROCESSED_DIR}/manifest.json" "${RUN_DIR}/dataset_manifest.json"
+
+echo
+echo "Stage 2/3: training"
+train_cmd=(
+  "${PYTHON_BIN}" -m astraguard_landcover.train
+  --config "${CONFIG}"
+  --data-dir "${PROCESSED_DIR}"
+  --output-dir "${RUN_DIR}"
+)
+if [[ -f "${RESUME}" ]]; then
+  train_cmd+=(--resume "${RESUME}")
+  echo "Resuming checkpoint: ${RESUME}"
+fi
+printf 'Command:'
+printf ' %q' "${train_cmd[@]}"
+printf '\n'
+"${train_cmd[@]}"
+
+CHECKPOINT="${RUN_DIR}/best.pt"
+if [[ ! -f "${CHECKPOINT}" ]]; then
+  echo "Training did not create the best checkpoint: ${CHECKPOINT}"
+  exit 6
+fi
+
+echo
+echo "Stage 3/3: held-out evaluation"
+"${PYTHON_BIN}" -m astraguard_landcover.evaluate \
+  --checkpoint "${CHECKPOINT}" \
+  --data-dir "${PROCESSED_DIR}" \
+  --output-dir "${EVAL_DIR}"
+
+echo
+echo "Finished: $(date)"
+echo "Checkpoint: ${CHECKPOINT}"
+echo "Test metrics: ${EVAL_DIR}/metrics.json"
+echo "PBS scratch can now be discarded: ${PROCESSED_DIR}"
+
