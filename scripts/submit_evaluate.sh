@@ -5,11 +5,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
+LEGACY_DATA_DIR="${ASTRAGUARD_DATA_DIR:-}"
+PYTHON_BIN="${PYTHON_BIN:-${ASTRAGUARD_VENV:-$HOME/.conda/envs/astraguard-landcover}/bin/python}"
 CHECKPOINT="${CHECKPOINT:?Set CHECKPOINT to the best.pt file}"
-PROCESSED_DIR="${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
+PROCESSED_DIR="${PROCESSED_DIR:-${LEGACY_DATA_DIR:+${LEGACY_DATA_DIR}/processed}}"
+: "${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
 EVAL_OUTPUT_DIR="${EVAL_OUTPUT_DIR:-$(dirname "${CHECKPOINT}")/test}"
-CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
+CACHE_DIR="${CACHE_DIR:-${ASTRAGUARD_CACHE_DIR:-$HOME/.cache/astraguard-landcover}}"
 STAGE_DATA="${STAGE_DATA:-1}"
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
@@ -34,4 +36,3 @@ EVAL_OUTPUT_DIR="${EVAL_OUTPUT_DIR}",\
 CACHE_DIR="${CACHE_DIR}",\
 STAGE_DATA="${STAGE_DATA}" \
 "${PROJECT_ROOT}/scripts/evaluate.pbs"
-

@@ -9,12 +9,14 @@ set -euo pipefail
 
 cd "${PBS_O_WORKDIR}"
 
-PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
+LEGACY_DATA_DIR="${ASTRAGUARD_DATA_DIR:-}"
+PYTHON_BIN="${PYTHON_BIN:-${ASTRAGUARD_VENV:-$HOME/.conda/envs/astraguard-landcover}/bin/python}"
 CONFIG="${CONFIG:-configs/deeplabv3plus.yaml}"
 RUN_NAME="${RUN_NAME:-deeplabv3plus_v1}"
-OUTPUT_DIR="${OUTPUT_DIR:-$PWD/runs}"
-PROCESSED_DIR="${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
-CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
+OUTPUT_DIR="${OUTPUT_DIR:-${ASTRAGUARD_RUNS_DIR:-$PWD/runs}}"
+PROCESSED_DIR="${PROCESSED_DIR:-${LEGACY_DATA_DIR:+${LEGACY_DATA_DIR}/processed}}"
+CACHE_DIR="${CACHE_DIR:-${ASTRAGUARD_CACHE_DIR:-$HOME/.cache/astraguard-landcover}}"
+: "${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
 STAGE_DATA="${STAGE_DATA:-1}"
 RESUME="${RESUME:-${OUTPUT_DIR}/${RUN_NAME}/last.pt}"
 JOB_TMPDIR="${TMPDIR:-/tmp/${USER}_${PBS_JOBID}}"
@@ -80,4 +82,3 @@ printf ' %q' "${cmd[@]}" | tee -a "${LIVE_LOG}"
 printf '\n' | tee -a "${LIVE_LOG}"
 "${cmd[@]}" 2>&1 | tee -a "${LIVE_LOG}"
 echo "Finished: $(date)" | tee -a "${LIVE_LOG}"
-

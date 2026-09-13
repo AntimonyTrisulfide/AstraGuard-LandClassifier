@@ -9,11 +9,13 @@ set -euo pipefail
 
 cd "${PBS_O_WORKDIR}"
 
-PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
+LEGACY_DATA_DIR="${ASTRAGUARD_DATA_DIR:-}"
+PYTHON_BIN="${PYTHON_BIN:-${ASTRAGUARD_VENV:-$HOME/.conda/envs/astraguard-landcover}/bin/python}"
 CHECKPOINT="${CHECKPOINT:?Set CHECKPOINT to the best.pt file}"
-PROCESSED_DIR="${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
+PROCESSED_DIR="${PROCESSED_DIR:-${LEGACY_DATA_DIR:+${LEGACY_DATA_DIR}/processed}}"
+: "${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
 EVAL_OUTPUT_DIR="${EVAL_OUTPUT_DIR:-$(dirname "${CHECKPOINT}")/test}"
-CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
+CACHE_DIR="${CACHE_DIR:-${ASTRAGUARD_CACHE_DIR:-$HOME/.cache/astraguard-landcover}}"
 STAGE_DATA="${STAGE_DATA:-1}"
 JOB_TMPDIR="${TMPDIR:-/tmp/${USER}_${PBS_JOBID}}"
 
@@ -62,4 +64,3 @@ printf ' %q' "${cmd[@]}" | tee -a "${LIVE_LOG}"
 printf '\n' | tee -a "${LIVE_LOG}"
 "${cmd[@]}" 2>&1 | tee -a "${LIVE_LOG}"
 echo "Finished: $(date)" | tee -a "${LIVE_LOG}"
-

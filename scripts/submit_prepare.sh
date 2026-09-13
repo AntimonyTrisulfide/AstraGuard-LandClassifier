@@ -5,9 +5,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
-RAW_DIR="${RAW_DIR:?Set RAW_DIR to the persistent raw-region directory}"
-PROCESSED_DIR="${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
+LEGACY_DATA_DIR="${ASTRAGUARD_DATA_DIR:-}"
+PYTHON_BIN="${PYTHON_BIN:-${ASTRAGUARD_VENV:-$HOME/.conda/envs/astraguard-landcover}/bin/python}"
+RAW_DIR="${RAW_DIR:-${LEGACY_DATA_DIR:+${LEGACY_DATA_DIR}/raw}}"
+PROCESSED_DIR="${PROCESSED_DIR:-${LEGACY_DATA_DIR:+${LEGACY_DATA_DIR}/processed}}"
+: "${RAW_DIR:?Set RAW_DIR to the persistent raw-region directory}"
+: "${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
 TILE_SIZE="${TILE_SIZE:-256}"
 STRIDE="${STRIDE:-256}"
 MIN_VALID_FRACTION="${MIN_VALID_FRACTION:-0.95}"
@@ -31,4 +34,3 @@ TILE_SIZE="${TILE_SIZE}",\
 STRIDE="${STRIDE}",\
 MIN_VALID_FRACTION="${MIN_VALID_FRACTION}" \
 "${PROJECT_ROOT}/scripts/prepare.pbs"
-

@@ -48,8 +48,8 @@ to MANIT and clone it into your persistent allocation:
 ```bash
 ssh <username>@<manit-login-host>
 cd "$HOME"
-git clone <your-repository-url> AstraGuard-Land-Cover
-cd AstraGuard-Land-Cover
+git clone https://github.com/AntimonyTrisulfide/AstraGuard-LandClassifier.git
+cd AstraGuard-LandClassifier
 ```
 
 Create the Conda environment once. This follows the PBS setup used by the
@@ -85,6 +85,26 @@ The PBS files use the same known MANIT convention as AudioPrism2.0: queue
 `dgx`, PBS `select` resources, `PBS_O_WORKDIR`, and `$TMPDIR`. Training requests
 one GPU, 12 CPUs, 64 GB RAM, and 24 hours. If your allocation has different
 limits, change only the `#PBS` resource lines.
+
+Verify CUDA with a short batch job; unlike `qsub -I`, this does not require an
+SSH terminal to remain connected while the job waits:
+
+```bash
+bash scripts/submit_gpu_smoke.sh
+qstat -u "$USER"
+```
+
+After completion, inspect `ag_gpu_smoke.o<job-id>` in the repository directory.
+
+If you created the environment file before the PBS conversion, it may contain
+the older names `ASTRAGUARD_DATA_DIR`, `ASTRAGUARD_RUNS_DIR`, and
+`ASTRAGUARD_VENV`. The launchers accept those names for compatibility, but the
+new explicit names are preferred. Verify them after sourcing:
+
+```bash
+printf 'PROJECT_ROOT=%s\nRAW_DIR=%s\nPROCESSED_DIR=%s\nOUTPUT_DIR=%s\nPYTHON_BIN=%s\n' \
+  "$PROJECT_ROOT" "$RAW_DIR" "$PROCESSED_DIR" "$OUTPUT_DIR" "$PYTHON_BIN"
+```
 
 ## 3. Build geographically separate raw regions
 

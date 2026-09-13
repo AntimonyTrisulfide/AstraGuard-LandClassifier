@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -N ag_gpu_smoke
+#PBS -q dgx
+#PBS -l select=1:ncpus=4:mem=16gb:ngpus=1
+#PBS -l walltime=00:15:00
+#PBS -j oe
+
+set -euo pipefail
+
+cd "${PBS_O_WORKDIR}"
+
+PYTHON_BIN="${PYTHON_BIN:-${ASTRAGUARD_VENV:-$HOME/.conda/envs/astraguard-landcover}/bin/python}"
+
+echo "Host: $(hostname)"
+echo "Started: $(date)"
+echo "PBS job: ${PBS_JOBID}"
+echo "Python: ${PYTHON_BIN}"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  echo "Python executable does not exist: ${PYTHON_BIN}"
+  exit 2
+fi
+
+nvidia-smi
+"${PYTHON_BIN}" -c \
+  'import torch; print("torch:", torch.__version__); print("cuda:", torch.cuda.is_available()); print("gpus:", torch.cuda.device_count()); print("device:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none")'
+
+echo "Finished: $(date)"
+

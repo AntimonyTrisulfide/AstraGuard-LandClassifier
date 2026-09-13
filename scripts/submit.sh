@@ -5,12 +5,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
+LEGACY_DATA_DIR="${ASTRAGUARD_DATA_DIR:-}"
+PYTHON_BIN="${PYTHON_BIN:-${ASTRAGUARD_VENV:-$HOME/.conda/envs/astraguard-landcover}/bin/python}"
 CONFIG="${CONFIG:-configs/deeplabv3plus.yaml}"
 RUN_NAME="${RUN_NAME:-deeplabv3plus_v1}"
-OUTPUT_DIR="${OUTPUT_DIR:-${PROJECT_ROOT}/runs}"
-PROCESSED_DIR="${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
-CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
+OUTPUT_DIR="${OUTPUT_DIR:-${ASTRAGUARD_RUNS_DIR:-${PROJECT_ROOT}/runs}}"
+PROCESSED_DIR="${PROCESSED_DIR:-${LEGACY_DATA_DIR:+${LEGACY_DATA_DIR}/processed}}"
+CACHE_DIR="${CACHE_DIR:-${ASTRAGUARD_CACHE_DIR:-$HOME/.cache/astraguard-landcover}}"
+: "${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
 STAGE_DATA="${STAGE_DATA:-1}"
 RESUME="${RESUME:-${OUTPUT_DIR}/${RUN_NAME}/last.pt}"
 
@@ -41,4 +43,3 @@ CACHE_DIR="${CACHE_DIR}",\
 STAGE_DATA="${STAGE_DATA}",\
 RESUME="${RESUME}" \
 "${PROJECT_ROOT}/scripts/train.pbs"
-
