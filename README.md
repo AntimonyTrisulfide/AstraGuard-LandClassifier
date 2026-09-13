@@ -20,22 +20,32 @@ PERSISTENT STORAGE
 Checkpoints + metrics + manifests + logs
 ```
 
-### First command: environment and raw-data download
+### First command: queue environment setup and raw-data download
 
-Run once on the HPC login node:
+Run once from the HPC login node. The work itself runs on the CPU-only
+`medium` queue:
 
 ```bash
 cd "$HOME/AstraGuard-LandClassifier"
-bash scripts/setup_and_download.sh
+bash scripts/submit_setup_and_download.sh
+qstat -u "$USER"
 ```
 
-This command:
+The submitted CPU job:
 
 - creates the `astraguard-landcover` Conda environment when missing;
 - installs the project and runs its tests;
 - caches DeepLabV3+ and SegFormer pretrained assets persistently;
 - downloads the three pilot Sentinel-2/WorldCover regions directly on HPC;
 - skips any region that is already complete.
+
+Its persistent log is written under:
+
+```text
+$HOME/AstraGuard-LandClassifier-data/logs/setup_download_<job-id>.log
+```
+
+Wait for this job to finish successfully before entering the second command.
 
 Default persistent locations:
 
@@ -97,7 +107,7 @@ to both stages:
 
 ```bash
 DATA_ROOT=/your/allocated/path/astraguard \
-bash scripts/setup_and_download.sh
+bash scripts/submit_setup_and_download.sh
 
 DATA_ROOT=/your/allocated/path/astraguard \
 bash scripts/submit_pipeline.sh
@@ -118,6 +128,15 @@ For SegFormer after the DeepLabV3+ baseline:
 CONFIG=configs/segformer.yaml \
 RUN_NAME=segformer_b0_v1 \
 bash scripts/submit_pipeline.sh
+```
+
+The CPU download queue can be overridden when a larger download needs more
+than 24 hours. Training always uses the dedicated `dgx` queue:
+
+```bash
+# Use the low-priority long CPU queue when a larger download needs over 24 h.
+DOWNLOAD_QUEUE=long DOWNLOAD_WALLTIME=48:00:00 \
+bash scripts/submit_setup_and_download.sh
 ```
 
 ## PBS resources
@@ -193,4 +212,3 @@ cd AstraGuard-LandClassifier
 - [WorldCover 2021 v200](https://doi.org/10.5281/zenodo.7254221)
 - [Planetary Computer STAC API](https://planetarycomputer.microsoft.com/docs/reference/stac/)
 - [Hugging Face SegFormer](https://huggingface.co/docs/transformers/model_doc/segformer)
-

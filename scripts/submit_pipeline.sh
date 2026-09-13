@@ -41,7 +41,7 @@ done
 mkdir -p "${OUTPUT_DIR}/${RUN_NAME}/logs" "${CACHE_DIR}"
 cd "${PROJECT_ROOT}"
 
-qsub -v \
+qsub -q dgx -v \
 PYTHON_BIN="${PYTHON_BIN}",\
 DATA_ROOT="${DATA_ROOT}",\
 RAW_DIR="${RAW_DIR}",\
@@ -54,4 +54,3 @@ TILE_SIZE="${TILE_SIZE}",\
 STRIDE="${STRIDE}",\
 MIN_VALID_FRACTION="${MIN_VALID_FRACTION}" \
 "${PROJECT_ROOT}/scripts/pipeline.pbs"
-

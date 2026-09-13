@@ -1,0 +1,41 @@
+#!/bin/bash
+#PBS -N ag_data_setup
+#PBS -q medium
+#PBS -l select=1:ncpus=8:mem=32gb
+#PBS -l walltime=24:00:00
+#PBS -j oe
+
+# CPU-only environment setup, model-cache population, and raw-data download.
+
+set -euo pipefail
+
+cd "${PBS_O_WORKDIR}"
+
+DATA_ROOT="${DATA_ROOT:-$HOME/AstraGuard-LandClassifier-data}"
+RAW_DIR="${RAW_DIR:-${DATA_ROOT}/raw}"
+CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
+PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
+CONDA_EXE="${CONDA_EXE:-$(command -v conda || true)}"
+
+mkdir -p "${DATA_ROOT}/logs" "${RAW_DIR}" "${CACHE_DIR}"
+LIVE_LOG="${DATA_ROOT}/logs/setup_download_${PBS_JOBID}.log"
+exec > >(tee -a "${LIVE_LOG}") 2>&1
+
+echo "AstraGuard CPU setup/download job"
+echo "Host: $(hostname)"
+echo "Started: $(date)"
+echo "PBS job: ${PBS_JOBID}"
+echo "Data root: ${DATA_ROOT}"
+echo "Conda: ${CONDA_EXE}"
+
+DATA_ROOT="${DATA_ROOT}" \
+RAW_DIR="${RAW_DIR}" \
+CACHE_DIR="${CACHE_DIR}" \
+PYTHON_BIN="${PYTHON_BIN}" \
+CONDA_EXE="${CONDA_EXE}" \
+BOOTSTRAP_ENV=1 \
+bash scripts/setup_and_download.sh
+
+echo "Finished: $(date)"
+echo "Next command: bash scripts/submit_pipeline.sh"
+

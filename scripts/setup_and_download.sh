@@ -23,20 +23,28 @@ echo "  raw:     ${RAW_DIR}"
 echo "  cache:   ${CACHE_DIR}"
 echo "  python:  ${PYTHON_BIN}"
 
-if [[ ! -x "${PYTHON_BIN}" ]]; then
+environment_ready() {
+  [[ -x "${PYTHON_BIN}" ]] && "${PYTHON_BIN}" -c \
+    'import astraguard_landcover, h5py, planetary_computer, rasterio, rioxarray, stackstac' \
+    >/dev/null 2>&1
+}
+
+if ! environment_ready; then
   if [[ "${BOOTSTRAP_ENV}" != "1" ]]; then
-    echo "Python environment is missing and BOOTSTRAP_ENV=0: ${PYTHON_BIN}" >&2
+    echo "Python environment is missing or incomplete and BOOTSTRAP_ENV=0: ${PYTHON_BIN}" >&2
     exit 2
   fi
-  echo "Creating the Conda environment and caching model weights..."
+  echo "Creating or completing the Conda environment and caching model weights..."
   ENV_NAME=astraguard-landcover \
   CACHE_DIR="${CACHE_DIR}" \
+  PYTHON_BIN="${PYTHON_BIN}" \
+  CONDA_EXE="${CONDA_EXE:-$(command -v conda || true)}" \
   PREFETCH_MODELS=1 \
   bash scripts/bootstrap_hpc.sh
 fi
 
-if [[ ! -x "${PYTHON_BIN}" ]]; then
-  echo "Python environment was not created at ${PYTHON_BIN}" >&2
+if ! environment_ready; then
+  echo "Python environment is still incomplete at ${PYTHON_BIN}" >&2
   exit 3
 fi
 
@@ -80,4 +88,3 @@ done
 echo
 echo "Environment and raw data are ready."
 echo "Next command: bash scripts/submit_pipeline.sh"
-
