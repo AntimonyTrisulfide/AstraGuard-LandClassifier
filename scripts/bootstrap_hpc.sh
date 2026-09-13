@@ -9,6 +9,10 @@ PREFETCH_MODELS="${PREFETCH_MODELS:-1}"
 ENV_PREFIX="${ENV_PREFIX:-$HOME/.conda/envs/${ENV_NAME}}"
 PYTHON_BIN="${PYTHON_BIN:-${ENV_PREFIX}/bin/python}"
 CONDA_EXE="${CONDA_EXE:-$(command -v conda || true)}"
+BOOTSTRAP_MARKER="${CACHE_DIR}/setup_complete_v1"
+
+mkdir -p "${CACHE_DIR}"
+rm -f "${BOOTSTRAP_MARKER}"
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
   if [[ -z "${CONDA_EXE}" || ! -x "${CONDA_EXE}" ]]; then
@@ -35,12 +39,12 @@ fi
 "${PYTHON_BIN}" -m pip install --only-binary=:all: -e ".[models,geo,dev]"
 "${PYTHON_BIN}" -m unittest discover -s tests -v
 
-mkdir -p "${CACHE_DIR}"
 export HF_HOME="${CACHE_DIR}/huggingface"
 export TORCH_HOME="${CACHE_DIR}/torch"
 if [[ "${PREFETCH_MODELS}" == "1" ]]; then
   "${PYTHON_BIN}" scripts/prefetch_models.py \
     configs/deeplabv3plus.yaml configs/segformer.yaml
+  touch "${BOOTSTRAP_MARKER}"
 fi
 
 echo "Environment ${ENV_NAME} is ready."

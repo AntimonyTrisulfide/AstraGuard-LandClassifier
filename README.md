@@ -49,7 +49,9 @@ Wait for this job to finish successfully before entering the second command.
 If a previous attempt stopped while compiling a Python dependency, pull the
 latest version and submit this same command again. The bootstrap repairs the
 existing environment, restricts third-party dependencies to compatible binary
-wheels, and skips completed downloads.
+wheels, pins the SegFormer-compatible Transformers 4 API, and skips completed
+downloads. Setup is considered complete only after both pretrained models have
+been cached successfully.
 
 Default persistent locations:
 

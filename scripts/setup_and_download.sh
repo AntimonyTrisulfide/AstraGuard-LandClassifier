@@ -13,6 +13,7 @@ RAW_DIR="${RAW_DIR:-${DATA_ROOT}/raw}"
 CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
 PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
 BOOTSTRAP_ENV="${BOOTSTRAP_ENV:-1}"
+BOOTSTRAP_MARKER="${CACHE_DIR}/setup_complete_v1"
 
 mkdir -p "${RAW_DIR}" "${CACHE_DIR}"
 cd "${PROJECT_ROOT}"
@@ -24,8 +25,11 @@ echo "  cache:   ${CACHE_DIR}"
 echo "  python:  ${PYTHON_BIN}"
 
 environment_ready() {
-  [[ -x "${PYTHON_BIN}" ]] && "${PYTHON_BIN}" -c \
-    'import astraguard_landcover, h5py, planetary_computer, rasterio, rioxarray, stackstac' \
+  [[ -x "${PYTHON_BIN}" && -f "${BOOTSTRAP_MARKER}" ]] \
+    && "${PYTHON_BIN}" -c \
+    'from importlib.metadata import version
+import astraguard_landcover, h5py, planetary_computer, rasterio, rioxarray, stackstac
+assert version("transformers") == "4.48.3"' \
     >/dev/null 2>&1
 }
 
