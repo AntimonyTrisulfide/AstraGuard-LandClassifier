@@ -36,7 +36,8 @@ The submitted CPU job:
 - creates the `astraguard-landcover` Conda environment when missing;
 - installs the project and runs its tests;
 - caches DeepLabV3+ and SegFormer pretrained assets persistently;
-- downloads the three pilot Sentinel-2/WorldCover regions directly on HPC;
+- downloads 36 geographically distributed Madhya Pradesh AOIs directly on HPC;
+- enforces a 50 GiB raw-data safety ceiling;
 - skips any region that is already complete.
 
 Its persistent log is written under:
@@ -59,6 +60,12 @@ Default persistent locations:
 $HOME/AstraGuard-LandClassifier-data/raw
 $HOME/.cache/astraguard-landcover
 ```
+
+The default [AOI manifest](configs/mp_aois.tsv) contains 26 training, five
+validation, and five held-out test regions. Each region covers `0.5° × 0.5°`;
+using the measured 37 MB for a `0.2° × 0.2°` pilot region, the expanded raw
+dataset is expected to occupy roughly 8–10 GB. The downloader prints cumulative
+usage after every AOI and stops before the configured 50 GiB limit.
 
 ### Second command: preprocess, train, and evaluate
 
@@ -152,6 +159,13 @@ DOWNLOAD_WALLTIME=48:00:00 \
 bash scripts/submit_setup_and_download.sh
 ```
 
+The dataset manifest and raw-data limit can be overridden explicitly:
+
+```bash
+AOI_MANIFEST=configs/mp_aois.tsv MAX_RAW_GB=50 \
+bash scripts/submit_setup_and_download.sh
+```
+
 ## PBS resources
 
 The pipeline follows the working MANIT/AudioPrism2.0 convention:
@@ -195,14 +209,21 @@ qstat -u "$USER"
 The complete remapping and raster contract is documented in
 [data/README.md](data/README.md).
 
-The three included AOIs are a pipeline pilot:
+The default MP manifest contains 36 non-identical city-and-rural AOIs:
 
-- Bhopal: train
-- Indore: validation
-- Jabalpur: test
+- 26 training regions distributed across central, western, and eastern MP;
+- five validation regions;
+- five untouched test regions: Gwalior, Jhabua, Balaghat, Singrauli, and
+  Burhanpur.
 
-For the final research experiment, add several non-touching train regions and
-multiple validation/test regions. Never randomly split neighbouring patches.
+The original three `0.2° × 0.2°` pilot directories may remain on disk, but the
+manifest-driven preprocessor excludes them. Splits are assigned by whole AOI;
+neighbouring image tiles are never randomly distributed across splits.
+
+The output grid remains at a genuine 10 m resolution. This is already the
+highest native spatial resolution among the selected Sentinel-2 bands; B11 and
+B12 are natively 20 m and are aligned onto the 10 m grid. Setting a smaller
+pixel size would only interpolate pixels and would not add real information.
 
 WorldCover is a derived land-cover product rather than perfect human ground
 truth. Final claims should also use a smaller independently inspected test set.

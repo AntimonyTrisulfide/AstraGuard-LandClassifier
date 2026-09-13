@@ -14,6 +14,10 @@ PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
 CONDA_EXE="${CONDA_EXE:-$(command -v conda || true)}"
 DOWNLOAD_QUEUE="${DOWNLOAD_QUEUE:-long}"
 DOWNLOAD_WALLTIME="${DOWNLOAD_WALLTIME:-24:00:00}"
+AOI_MANIFEST="${AOI_MANIFEST:-configs/mp_aois.tsv}"
+MAX_RAW_GB="${MAX_RAW_GB:-50}"
+SENTINEL_MAX_SCENES="${SENTINEL_MAX_SCENES:-12}"
+SENTINEL_MAX_CLOUD="${SENTINEL_MAX_CLOUD:-20}"
 
 if [[ -z "${CONDA_EXE}" || ! -x "${CONDA_EXE}" ]]; then
   echo "Conda executable not found. Set CONDA_EXE to its absolute path." >&2
@@ -31,5 +35,9 @@ DATA_ROOT="${DATA_ROOT}",\
 RAW_DIR="${RAW_DIR}",\
 CACHE_DIR="${CACHE_DIR}",\
 PYTHON_BIN="${PYTHON_BIN}",\
-CONDA_EXE="${CONDA_EXE}" \
+CONDA_EXE="${CONDA_EXE}",\
+AOI_MANIFEST="${AOI_MANIFEST}",\
+MAX_RAW_GB="${MAX_RAW_GB}",\
+SENTINEL_MAX_SCENES="${SENTINEL_MAX_SCENES}",\
+SENTINEL_MAX_CLOUD="${SENTINEL_MAX_CLOUD}" \
 "${PROJECT_ROOT}/scripts/setup_and_download.pbs"

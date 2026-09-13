@@ -17,6 +17,7 @@ from .classes import (
     IGNORE_INDEX,
     remap_worldcover,
 )
+from .aoi_manifest import load_aoi_manifest
 from .utils import write_json
 
 
@@ -124,6 +125,7 @@ def _prepare(
     stride: int,
     min_valid_fraction: float,
     scale_divisor: float,
+    aoi_manifest: Path | None = None,
 ) -> dict[str, Any]:
     try:
         import rasterio
@@ -131,7 +133,13 @@ def _prepare(
     except ImportError as exc:
         raise ImportError("Tile preparation requires: pip install -e '.[geo]'") from exc
 
-    region_dirs = sorted(path for path in raw_dir.iterdir() if path.is_dir())
+    expected_splits: dict[str, str] = {}
+    if aoi_manifest is not None:
+        records = load_aoi_manifest(aoi_manifest)
+        region_dirs = [raw_dir / record.region_id for record in records]
+        expected_splits = {record.region_id: record.split for record in records}
+    else:
+        region_dirs = sorted(path for path in raw_dir.iterdir() if path.is_dir())
     if not region_dirs:
         raise FileNotFoundError(f"No region directories found in {raw_dir}")
 
@@ -149,8 +157,16 @@ def _prepare(
 
     try:
         for region_dir in region_dirs:
+            if not region_dir.is_dir():
+                raise FileNotFoundError(f"Missing region directory: {region_dir}")
             metadata = _load_region_metadata(region_dir)
             split = str(metadata["split"]).lower()
+            expected_split = expected_splits.get(region_dir.name)
+            if expected_split is not None and split != expected_split:
+                raise ValueError(
+                    f"{region_dir}: metadata split {split!r} does not match "
+                    f"manifest split {expected_split!r}"
+                )
             image_path = region_dir / "image.tif"
             label_path = region_dir / "worldcover.tif"
             if not image_path.exists() or not label_path.exists():
@@ -284,6 +300,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stride", type=int, default=256)
     parser.add_argument("--min-valid-fraction", type=float, default=0.95)
     parser.add_argument("--scale-divisor", type=float, default=10000.0)
+    parser.add_argument(
+        "--aoi-manifest",
+        type=Path,
+        help="Only preprocess regions listed in this tab-separated manifest",
+    )
     return parser
 
 
@@ -300,10 +321,10 @@ def main() -> None:
         args.stride,
         args.min_valid_fraction,
         args.scale_divisor,
+        args.aoi_manifest,
     )
     print(json.dumps(manifest["split_tile_counts"], indent=2))
 
 
 if __name__ == "__main__":
     main()
-

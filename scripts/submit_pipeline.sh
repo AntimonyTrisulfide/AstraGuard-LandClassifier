@@ -19,6 +19,11 @@ TILE_SIZE="${TILE_SIZE:-256}"
 STRIDE="${STRIDE:-256}"
 MIN_VALID_FRACTION="${MIN_VALID_FRACTION:-0.95}"
 GPU_QUEUE="${GPU_QUEUE:-dgx}"
+AOI_MANIFEST="${AOI_MANIFEST:-configs/mp_aois.tsv}"
+
+if [[ "${AOI_MANIFEST}" != /* ]]; then
+  AOI_MANIFEST="${PROJECT_ROOT}/${AOI_MANIFEST}"
+fi
 
 case "${GPU_QUEUE}" in
   dgx|max_dgx) ;;
@@ -37,15 +42,13 @@ if [[ ! -f "${PROJECT_ROOT}/${CONFIG}" && ! -f "${CONFIG}" ]]; then
   echo "Training config does not exist: ${CONFIG}" >&2
   exit 3
 fi
-for region_id in bhopal_train indore_val jabalpur_test; do
-  for required in image.tif worldcover.tif metadata.json; do
-    if [[ ! -f "${RAW_DIR}/${region_id}/${required}" ]]; then
-      echo "Raw data is missing: ${RAW_DIR}/${region_id}/${required}" >&2
-      echo "Run first: bash scripts/setup_and_download.sh" >&2
-      exit 4
-    fi
-  done
-done
+if ! "${PYTHON_BIN}" -m astraguard_landcover.download_manifest \
+  --manifest "${AOI_MANIFEST}" \
+  --output-root "${RAW_DIR}" \
+  --check-only; then
+  echo "Raw data is incomplete. Run: bash scripts/submit_setup_and_download.sh" >&2
+  exit 4
+fi
 
 mkdir -p "${OUTPUT_DIR}/${RUN_NAME}/logs" "${CACHE_DIR}"
 cd "${PROJECT_ROOT}"
@@ -61,5 +64,6 @@ RUN_NAME="${RUN_NAME}",\
 RESUME="${RESUME}",\
 TILE_SIZE="${TILE_SIZE}",\
 STRIDE="${STRIDE}",\
-MIN_VALID_FRACTION="${MIN_VALID_FRACTION}" \
+MIN_VALID_FRACTION="${MIN_VALID_FRACTION}",\
+AOI_MANIFEST="${AOI_MANIFEST}" \
 "${PROJECT_ROOT}/scripts/pipeline.pbs"

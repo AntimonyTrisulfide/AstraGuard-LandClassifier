@@ -23,10 +23,15 @@ RESUME="${RESUME:-${OUTPUT_DIR}/${RUN_NAME}/last.pt}"
 TILE_SIZE="${TILE_SIZE:-256}"
 STRIDE="${STRIDE:-256}"
 MIN_VALID_FRACTION="${MIN_VALID_FRACTION:-0.95}"
+AOI_MANIFEST="${AOI_MANIFEST:-configs/mp_aois.tsv}"
 JOB_TMPDIR="${TMPDIR:-/tmp/${USER}_${PBS_JOBID}}"
 PROCESSED_DIR="${JOB_TMPDIR}/astraguard-processed"
 RUN_DIR="${OUTPUT_DIR}/${RUN_NAME}"
 EVAL_DIR="${RUN_DIR}/test"
+
+if [[ "${AOI_MANIFEST}" != /* ]]; then
+  AOI_MANIFEST="${PBS_O_WORKDIR}/${AOI_MANIFEST}"
+fi
 
 mkdir -p "${PROCESSED_DIR}" "${RUN_DIR}/logs" "${EVAL_DIR}" "${CACHE_DIR}"
 LIVE_LOG="${RUN_DIR}/logs/pbs_${PBS_JOBID}.log"
@@ -39,6 +44,7 @@ echo "Started: $(date)"
 echo "PBS job: ${PBS_JOBID}"
 echo "Python: ${PYTHON_BIN}"
 echo "Raw data: ${RAW_DIR}"
+echo "AOI manifest: ${AOI_MANIFEST}"
 echo "Temporary processed data: ${PROCESSED_DIR}"
 echo "Persistent run output: ${RUN_DIR}"
 echo "Config: ${CONFIG}"
@@ -51,14 +57,10 @@ if [[ ! -f "${CONFIG}" ]]; then
   echo "Training config does not exist: ${CONFIG}"
   exit 3
 fi
-for region_id in bhopal_train indore_val jabalpur_test; do
-  for required in image.tif worldcover.tif metadata.json; do
-    if [[ ! -f "${RAW_DIR}/${region_id}/${required}" ]]; then
-      echo "Required raw input does not exist: ${RAW_DIR}/${region_id}/${required}"
-      exit 4
-    fi
-  done
-done
+"${PYTHON_BIN}" -m astraguard_landcover.download_manifest \
+  --manifest "${AOI_MANIFEST}" \
+  --output-root "${RAW_DIR}" \
+  --check-only
 
 export HF_HOME="${CACHE_DIR}/huggingface"
 export TORCH_HOME="${CACHE_DIR}/torch"
@@ -77,7 +79,8 @@ echo "Stage 1/3: preprocessing raw rasters into PBS scratch"
   --output-dir "${PROCESSED_DIR}" \
   --tile-size "${TILE_SIZE}" \
   --stride "${STRIDE}" \
-  --min-valid-fraction "${MIN_VALID_FRACTION}"
+  --min-valid-fraction "${MIN_VALID_FRACTION}" \
+  --aoi-manifest "${AOI_MANIFEST}"
 
 for required in train.h5 val.h5 test.h5 stats.json manifest.json; do
   if [[ ! -f "${PROCESSED_DIR}/${required}" ]]; then
@@ -125,4 +128,3 @@ echo "Finished: $(date)"
 echo "Checkpoint: ${CHECKPOINT}"
 echo "Test metrics: ${EVAL_DIR}/metrics.json"
 echo "PBS scratch can now be discarded: ${PROCESSED_DIR}"
-

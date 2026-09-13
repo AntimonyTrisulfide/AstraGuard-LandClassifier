@@ -14,6 +14,14 @@ CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
 PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
 BOOTSTRAP_ENV="${BOOTSTRAP_ENV:-1}"
 BOOTSTRAP_MARKER="${CACHE_DIR}/setup_complete_v1"
+AOI_MANIFEST="${AOI_MANIFEST:-configs/mp_aois.tsv}"
+MAX_RAW_GB="${MAX_RAW_GB:-50}"
+SENTINEL_MAX_SCENES="${SENTINEL_MAX_SCENES:-12}"
+SENTINEL_MAX_CLOUD="${SENTINEL_MAX_CLOUD:-20}"
+
+if [[ "${AOI_MANIFEST}" != /* ]]; then
+  AOI_MANIFEST="${PROJECT_ROOT}/${AOI_MANIFEST}"
+fi
 
 mkdir -p "${RAW_DIR}" "${CACHE_DIR}"
 cd "${PROJECT_ROOT}"
@@ -23,6 +31,8 @@ echo "  project: ${PROJECT_ROOT}"
 echo "  raw:     ${RAW_DIR}"
 echo "  cache:   ${CACHE_DIR}"
 echo "  python:  ${PYTHON_BIN}"
+echo "  AOIs:    ${AOI_MANIFEST}"
+echo "  limit:   ${MAX_RAW_GB} GiB raw data"
 
 environment_ready() {
   [[ -x "${PYTHON_BIN}" && -f "${BOOTSTRAP_MARKER}" ]] \
@@ -52,42 +62,12 @@ if ! environment_ready; then
   exit 3
 fi
 
-download_region() {
-  local region_id="$1"
-  local split="$2"
-  local west="$3"
-  local south="$4"
-  local east="$5"
-  local north="$6"
-  local region_dir="${RAW_DIR}/${region_id}"
-
-  if [[ -f "${region_dir}/image.tif" \
-    && -f "${region_dir}/worldcover.tif" \
-    && -f "${region_dir}/metadata.json" ]]; then
-    echo "Data already complete; skipping ${region_id}"
-    return
-  fi
-
-  echo "Downloading ${region_id}..."
-  "${PYTHON_BIN}" -m astraguard_landcover.download_aoi \
-    --region-id "${region_id}" \
-    --split "${split}" \
-    --bbox "${west}" "${south}" "${east}" "${north}" \
-    --output-root "${RAW_DIR}"
-}
-
-download_region bhopal_train train 77.30 23.15 77.50 23.35
-download_region indore_val val 75.75 22.62 75.95 22.82
-download_region jabalpur_test test 79.85 23.08 80.05 23.28
-
-for region_id in bhopal_train indore_val jabalpur_test; do
-  for required in image.tif worldcover.tif metadata.json; do
-    if [[ ! -f "${RAW_DIR}/${region_id}/${required}" ]]; then
-      echo "Download incomplete: ${RAW_DIR}/${region_id}/${required}" >&2
-      exit 4
-    fi
-  done
-done
+"${PYTHON_BIN}" -m astraguard_landcover.download_manifest \
+  --manifest "${AOI_MANIFEST}" \
+  --output-root "${RAW_DIR}" \
+  --max-raw-gb "${MAX_RAW_GB}" \
+  --max-scenes "${SENTINEL_MAX_SCENES}" \
+  --max-cloud "${SENTINEL_MAX_CLOUD}"
 
 echo
 echo "Environment and raw data are ready."

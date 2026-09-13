@@ -41,6 +41,7 @@ astraguard-evaluate = "astraguard_landcover.evaluate:main"
 astraguard-predict = "astraguard_landcover.predict:main"
 astraguard-prepare = "astraguard_landcover.prepare_tiles:main"
 astraguard-download-aoi = "astraguard_landcover.download_aoi:main"
+astraguard-download-manifest = "astraguard_landcover.download_manifest:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
