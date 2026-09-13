@@ -15,6 +15,7 @@ from .utils import write_json
 
 STAC_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
 BAD_SCL_VALUES = (0, 1, 3, 8, 9, 10, 11)
+FLOAT32_FILL_VALUE = np.float32(np.nan)
 
 
 def _utm_epsg(longitude: float, latitude: float) -> int:
@@ -114,7 +115,7 @@ def download_region(
         sentinel_items,
         assets=list(BAND_NAMES),
         dtype="float32",
-        fill_value=np.nan,
+        fill_value=FLOAT32_FILL_VALUE,
         resampling=Resampling.bilinear,
         **stack_arguments,
     )
@@ -122,7 +123,7 @@ def download_region(
         sentinel_items,
         assets=["SCL"],
         dtype="float32",
-        fill_value=np.nan,
+        fill_value=FLOAT32_FILL_VALUE,
         resampling=Resampling.nearest,
         **stack_arguments,
     ).sel(band="SCL")
@@ -152,7 +153,7 @@ def download_region(
         resolution=10,
         bounds_latlon=bbox,
         dtype="uint8",
-        fill_value=0,
+        fill_value=np.uint8(0),
         rescale=False,
         resampling=Resampling.nearest,
         chunksize=2048,
