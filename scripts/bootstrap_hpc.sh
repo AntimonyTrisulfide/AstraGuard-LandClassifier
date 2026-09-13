@@ -27,8 +27,12 @@ fi
 "${PYTHON_BIN}" -m pip install --only-binary=:all: \
   "numpy==1.26.4" \
   "h5py==3.10.0" \
-  "rasterio==1.3.10"
-"${PYTHON_BIN}" -m pip install -e ".[models,geo,dev]"
+  "rasterio==1.3.10" \
+  "contourpy==1.2.1"
+# Compute nodes do not provide a build toolchain. Restrict every third-party
+# dependency to wheels so pip can select an older compatible binary instead of
+# repeatedly attempting source builds.
+"${PYTHON_BIN}" -m pip install --only-binary=:all: -e ".[models,geo,dev]"
 "${PYTHON_BIN}" -m unittest discover -s tests -v
 
 mkdir -p "${CACHE_DIR}"
