@@ -12,7 +12,7 @@ LOGIN NODE — persistent storage
 Environment setup + pretrained weights + raw-data download
                          |
                          v
-DGX PBS JOB — job-local $TMPDIR
+GPU PBS JOB (dgx or max_dgx) — job-local $TMPDIR
 Preprocessing -> training -> held-out evaluation
                          |
                          v
@@ -23,7 +23,7 @@ Checkpoints + metrics + manifests + logs
 ### First command: queue environment setup and raw-data download
 
 Run once from the HPC login node. The work itself runs on the CPU-only
-`medium` queue:
+`long` queue:
 
 ```bash
 cd "$HOME/AstraGuard-LandClassifier"
@@ -60,11 +60,17 @@ This command can be entered even when no GPU is currently free:
 
 ```bash
 cd "$HOME/AstraGuard-LandClassifier"
+# Default GPU queue: dgx
 bash scripts/submit_pipeline.sh
+
+# Or select max_dgx
+GPU_QUEUE=max_dgx bash scripts/submit_pipeline.sh
 ```
 
-PBS returns a job ID and leaves it queued until a DGX GPU is available. Inside
-that one allocation, [scripts/pipeline.pbs](scripts/pipeline.pbs) performs:
+Submit only one of the two commands. PBS returns a job ID and leaves it queued
+until a GPU is available in the selected queue. The launcher rejects every
+queue except `dgx` and `max_dgx`. Inside that one allocation,
+[scripts/pipeline.pbs](scripts/pipeline.pbs) performs:
 
 1. Generate `train.h5`, `val.h5`, and `test.h5` under `$TMPDIR`.
 2. Train DeepLabV3+ against those exact temporary paths.
@@ -130,12 +136,13 @@ RUN_NAME=segformer_b0_v1 \
 bash scripts/submit_pipeline.sh
 ```
 
-The CPU download queue can be overridden when a larger download needs more
-than 24 hours. Training always uses the dedicated `dgx` queue:
+The CPU setup/download job uses the low-priority `long` queue by default.
+Its walltime can be increased when a larger download needs more than 24 hours.
+Training uses only the selected `dgx` or `max_dgx` queue:
 
 ```bash
-# Use the low-priority long CPU queue when a larger download needs over 24 h.
-DOWNLOAD_QUEUE=long DOWNLOAD_WALLTIME=48:00:00 \
+# Increase the long-queue walltime when a larger download needs over 24 h.
+DOWNLOAD_WALLTIME=48:00:00 \
 bash scripts/submit_setup_and_download.sh
 ```
 
@@ -150,12 +157,20 @@ The pipeline follows the working MANIT/AudioPrism2.0 convention:
 #PBS -j oe
 ```
 
+The `#PBS -q dgx` line is the safe default; the launcher overrides it with
+`qsub -q max_dgx` when `GPU_QUEUE=max_dgx` is selected.
+
 Change only these resource lines if MANIT changes the allocation policy.
 
 A short optional GPU smoke test is available:
 
 ```bash
+# dgx (default)
 bash scripts/submit_gpu_smoke.sh
+
+# max_dgx
+GPU_QUEUE=max_dgx bash scripts/submit_gpu_smoke.sh
+
 qstat -u "$USER"
 ```
 

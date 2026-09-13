@@ -18,6 +18,15 @@ RESUME="${RESUME:-${OUTPUT_DIR}/${RUN_NAME}/last.pt}"
 TILE_SIZE="${TILE_SIZE:-256}"
 STRIDE="${STRIDE:-256}"
 MIN_VALID_FRACTION="${MIN_VALID_FRACTION:-0.95}"
+GPU_QUEUE="${GPU_QUEUE:-dgx}"
+
+case "${GPU_QUEUE}" in
+  dgx|max_dgx) ;;
+  *)
+    echo "Invalid GPU_QUEUE '${GPU_QUEUE}'. Choose dgx or max_dgx." >&2
+    exit 2
+    ;;
+esac
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
   echo "Python environment is missing: ${PYTHON_BIN}" >&2
@@ -41,7 +50,7 @@ done
 mkdir -p "${OUTPUT_DIR}/${RUN_NAME}/logs" "${CACHE_DIR}"
 cd "${PROJECT_ROOT}"
 
-qsub -q dgx -v \
+qsub -q "${GPU_QUEUE}" -v \
 PYTHON_BIN="${PYTHON_BIN}",\
 DATA_ROOT="${DATA_ROOT}",\
 RAW_DIR="${RAW_DIR}",\

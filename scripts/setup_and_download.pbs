@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N ag_data_setup
-#PBS -q medium
+#PBS -q long
 #PBS -l select=1:ncpus=8:mem=32gb
 #PBS -l walltime=24:00:00
 #PBS -j oe
@@ -38,4 +38,3 @@ bash scripts/setup_and_download.sh
 
 echo "Finished: $(date)"
 echo "Next command: bash scripts/submit_pipeline.sh"
-

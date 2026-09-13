@@ -12,7 +12,7 @@ RAW_DIR="${RAW_DIR:-${DATA_ROOT}/raw}"
 CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
 PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
 CONDA_EXE="${CONDA_EXE:-$(command -v conda || true)}"
-DOWNLOAD_QUEUE="${DOWNLOAD_QUEUE:-medium}"
+DOWNLOAD_QUEUE="${DOWNLOAD_QUEUE:-long}"
 DOWNLOAD_WALLTIME="${DOWNLOAD_WALLTIME:-24:00:00}"
 
 if [[ -z "${CONDA_EXE}" || ! -x "${CONDA_EXE}" ]]; then
@@ -33,4 +33,3 @@ CACHE_DIR="${CACHE_DIR}",\
 PYTHON_BIN="${PYTHON_BIN}",\
 CONDA_EXE="${CONDA_EXE}" \
 "${PROJECT_ROOT}/scripts/setup_and_download.pbs"
-
