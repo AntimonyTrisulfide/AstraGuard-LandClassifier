@@ -21,6 +21,12 @@ else
 fi
 
 "${PYTHON_BIN}" -m pip install --upgrade pip
+# MANIT's older compute-node runtime cannot use the newest h5py/NumPy wheels.
+# Pin compatible manylinux2014 binaries so pip never falls back to a local
+# source build (the cluster image does not provide a C++ compiler).
+"${PYTHON_BIN}" -m pip install --only-binary=:all: \
+  "numpy==1.26.4" \
+  "h5py==3.10.0"
 "${PYTHON_BIN}" -m pip install -e ".[models,geo,dev]"
 "${PYTHON_BIN}" -m unittest discover -s tests -v
 

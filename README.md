@@ -46,6 +46,9 @@ $HOME/AstraGuard-LandClassifier-data/logs/setup_download_<job-id>.log
 ```
 
 Wait for this job to finish successfully before entering the second command.
+If a previous attempt stopped while compiling NumPy or h5py, pull the latest
+version and submit this same command again. The bootstrap repairs the existing
+environment using compatible binary wheels and completed downloads are skipped.
 
 Default persistent locations:
 
