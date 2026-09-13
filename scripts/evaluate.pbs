@@ -1,0 +1,65 @@
+#!/bin/bash
+#PBS -N ag_landcover_eval
+#PBS -q dgx
+#PBS -l select=1:ncpus=8:mem=32gb:ngpus=1
+#PBS -l walltime=04:00:00
+#PBS -j oe
+
+set -euo pipefail
+
+cd "${PBS_O_WORKDIR}"
+
+PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
+CHECKPOINT="${CHECKPOINT:?Set CHECKPOINT to the best.pt file}"
+PROCESSED_DIR="${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
+EVAL_OUTPUT_DIR="${EVAL_OUTPUT_DIR:-$(dirname "${CHECKPOINT}")/test}"
+CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
+STAGE_DATA="${STAGE_DATA:-1}"
+JOB_TMPDIR="${TMPDIR:-/tmp/${USER}_${PBS_JOBID}}"
+
+mkdir -p "${EVAL_OUTPUT_DIR}/logs" "${CACHE_DIR}"
+LIVE_LOG="${EVAL_OUTPUT_DIR}/logs/pbs_${PBS_JOBID}.log"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  echo "Python executable does not exist: ${PYTHON_BIN}" | tee -a "${LIVE_LOG}"
+  exit 2
+fi
+for required in "${CHECKPOINT}" "${PROCESSED_DIR}/test.h5" \
+  "${PROCESSED_DIR}/stats.json" "${PROCESSED_DIR}/manifest.json"; do
+  if [[ ! -f "${required}" ]]; then
+    echo "Required file does not exist: ${required}" | tee -a "${LIVE_LOG}"
+    exit 3
+  fi
+done
+
+export HF_HOME="${CACHE_DIR}/huggingface"
+export TORCH_HOME="${CACHE_DIR}/torch"
+export HF_HUB_OFFLINE=1
+export TOKENIZERS_PARALLELISM=false
+
+EVAL_DATA="${PROCESSED_DIR}"
+if [[ "${STAGE_DATA}" == "1" ]]; then
+  EVAL_DATA="${JOB_TMPDIR}/astraguard-test"
+  mkdir -p "${EVAL_DATA}"
+  cp "${PROCESSED_DIR}/test.h5" "${EVAL_DATA}/"
+  cp "${PROCESSED_DIR}/stats.json" "${EVAL_DATA}/"
+  cp "${PROCESSED_DIR}/manifest.json" "${EVAL_DATA}/"
+fi
+
+echo "Host: $(hostname)" | tee -a "${LIVE_LOG}"
+echo "Started: $(date)" | tee -a "${LIVE_LOG}"
+echo "Checkpoint: ${CHECKPOINT}" | tee -a "${LIVE_LOG}"
+nvidia-smi | tee -a "${LIVE_LOG}"
+
+cmd=(
+  "${PYTHON_BIN}" -m astraguard_landcover.evaluate
+  --checkpoint "${CHECKPOINT}"
+  --data-dir "${EVAL_DATA}"
+  --output-dir "${EVAL_OUTPUT_DIR}"
+)
+printf 'Command:' | tee -a "${LIVE_LOG}"
+printf ' %q' "${cmd[@]}" | tee -a "${LIVE_LOG}"
+printf '\n' | tee -a "${LIVE_LOG}"
+"${cmd[@]}" 2>&1 | tee -a "${LIVE_LOG}"
+echo "Finished: $(date)" | tee -a "${LIVE_LOG}"
+

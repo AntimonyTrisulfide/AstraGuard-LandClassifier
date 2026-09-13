@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "astraguard-landcover"
+version = "0.1.0"
+description = "Multispectral Sentinel-2 land-cover segmentation for AstraGuard"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+  "h5py>=3.10,<4",
+  "matplotlib>=3.8,<4",
+  "numpy>=1.26,<3",
+  "PyYAML>=6,<7",
+  "tqdm>=4.66,<5",
+]
+
+[project.optional-dependencies]
+models = [
+  "segmentation-models-pytorch>=0.5,<0.6",
+  "torch>=2.4,<3",
+  "torchvision>=0.19,<1",
+  "transformers>=4.48,<6",
+]
+geo = [
+  "dask[array]>=2024.1",
+  "planetary-computer>=1.0,<2",
+  "pystac-client>=0.8,<1",
+  "rasterio>=1.4,<2",
+  "rioxarray>=0.18,<1",
+  "stackstac>=0.5,<1",
+]
+dev = [
+  "pytest>=8,<10",
+]
+
+[project.scripts]
+astraguard-train = "astraguard_landcover.train:main"
+astraguard-evaluate = "astraguard_landcover.evaluate:main"
+astraguard-predict = "astraguard_landcover.predict:main"
+astraguard-prepare = "astraguard_landcover.prepare_tiles:main"
+astraguard-download-aoi = "astraguard_landcover.download_aoi:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

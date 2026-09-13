@@ -1,0 +1,51 @@
+#!/bin/bash
+#PBS -N ag_landcover_prep
+#PBS -q dgx
+#PBS -l select=1:ncpus=12:mem=64gb
+#PBS -l walltime=08:00:00
+#PBS -j oe
+
+set -euo pipefail
+
+cd "${PBS_O_WORKDIR}"
+
+PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
+RAW_DIR="${RAW_DIR:?Set RAW_DIR to the persistent raw-region directory}"
+PROCESSED_DIR="${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
+TILE_SIZE="${TILE_SIZE:-256}"
+STRIDE="${STRIDE:-256}"
+MIN_VALID_FRACTION="${MIN_VALID_FRACTION:-0.95}"
+
+mkdir -p "${PROCESSED_DIR}/logs"
+LIVE_LOG="${PROCESSED_DIR}/logs/prepare_${PBS_JOBID}.log"
+
+echo "Host: $(hostname)" | tee -a "${LIVE_LOG}"
+echo "Started: $(date)" | tee -a "${LIVE_LOG}"
+echo "Python: ${PYTHON_BIN}" | tee -a "${LIVE_LOG}"
+echo "Raw data: ${RAW_DIR}" | tee -a "${LIVE_LOG}"
+echo "Processed data: ${PROCESSED_DIR}" | tee -a "${LIVE_LOG}"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  echo "Python executable does not exist: ${PYTHON_BIN}" | tee -a "${LIVE_LOG}"
+  exit 2
+fi
+if [[ ! -d "${RAW_DIR}" ]]; then
+  echo "Raw data directory does not exist: ${RAW_DIR}" | tee -a "${LIVE_LOG}"
+  exit 3
+fi
+
+cmd=(
+  "${PYTHON_BIN}" -m astraguard_landcover.prepare_tiles
+  --raw-dir "${RAW_DIR}"
+  --output-dir "${PROCESSED_DIR}"
+  --tile-size "${TILE_SIZE}"
+  --stride "${STRIDE}"
+  --min-valid-fraction "${MIN_VALID_FRACTION}"
+)
+
+printf 'Command:' | tee -a "${LIVE_LOG}"
+printf ' %q' "${cmd[@]}" | tee -a "${LIVE_LOG}"
+printf '\n' | tee -a "${LIVE_LOG}"
+"${cmd[@]}" 2>&1 | tee -a "${LIVE_LOG}"
+echo "Finished: $(date)" | tee -a "${LIVE_LOG}"
+

@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Datasets and model artifacts are never committed.
+data/raw/
+data/processed/
+checkpoints/
+results/
+logs/
+*.h5
+*.hdf5
+*.pt
+*.pth
+
+# Local environment configuration.
+.env
+

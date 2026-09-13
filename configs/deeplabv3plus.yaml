@@ -1,0 +1,27 @@
+experiment_name: deeplabv3plus_resnet34
+
+data:
+  processed_dir: data/processed
+  num_workers: 8
+  scale_divisor: 10000.0
+  augment: true
+
+model:
+  name: deeplabv3plus
+  encoder_name: resnet34
+  encoder_weights: imagenet
+  in_channels: 6
+  num_classes: 6
+
+training:
+  seed: 42
+  epochs: 60
+  batch_size: 16
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  amp: true
+  ce_weight: 0.6
+  dice_weight: 0.4
+  early_stopping_patience: 10
+  output_dir: results/deeplabv3plus_resnet34
+

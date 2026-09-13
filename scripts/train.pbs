@@ -1,0 +1,83 @@
+#!/bin/bash
+#PBS -N ag_landcover_train
+#PBS -q dgx
+#PBS -l select=1:ncpus=12:mem=64gb:ngpus=1
+#PBS -l walltime=24:00:00
+#PBS -j oe
+
+set -euo pipefail
+
+cd "${PBS_O_WORKDIR}"
+
+PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
+CONFIG="${CONFIG:-configs/deeplabv3plus.yaml}"
+RUN_NAME="${RUN_NAME:-deeplabv3plus_v1}"
+OUTPUT_DIR="${OUTPUT_DIR:-$PWD/runs}"
+PROCESSED_DIR="${PROCESSED_DIR:?Set PROCESSED_DIR to the persistent HDF5 directory}"
+CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
+STAGE_DATA="${STAGE_DATA:-1}"
+RESUME="${RESUME:-${OUTPUT_DIR}/${RUN_NAME}/last.pt}"
+JOB_TMPDIR="${TMPDIR:-/tmp/${USER}_${PBS_JOBID}}"
+
+mkdir -p "${OUTPUT_DIR}/${RUN_NAME}/logs" "${CACHE_DIR}"
+LIVE_LOG="${OUTPUT_DIR}/${RUN_NAME}/logs/pbs_${PBS_JOBID}.log"
+
+echo "Host: $(hostname)" | tee -a "${LIVE_LOG}"
+echo "Started: $(date)" | tee -a "${LIVE_LOG}"
+echo "Python: ${PYTHON_BIN}" | tee -a "${LIVE_LOG}"
+echo "Config: ${CONFIG}" | tee -a "${LIVE_LOG}"
+echo "PBS scratch: ${JOB_TMPDIR}" | tee -a "${LIVE_LOG}"
+echo "Persistent data: ${PROCESSED_DIR}" | tee -a "${LIVE_LOG}"
+
+if [[ ! -x "${PYTHON_BIN}" ]]; then
+  echo "Python executable does not exist: ${PYTHON_BIN}" | tee -a "${LIVE_LOG}"
+  exit 2
+fi
+for required in train.h5 val.h5 stats.json manifest.json; do
+  if [[ ! -f "${PROCESSED_DIR}/${required}" ]]; then
+    echo "Required dataset file does not exist: ${PROCESSED_DIR}/${required}" \
+      | tee -a "${LIVE_LOG}"
+    exit 3
+  fi
+done
+
+export HF_HOME="${CACHE_DIR}/huggingface"
+export TORCH_HOME="${CACHE_DIR}/torch"
+export HF_HUB_OFFLINE=1
+export TOKENIZERS_PARALLELISM=false
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-12}"
+
+TRAIN_DATA="${PROCESSED_DIR}"
+if [[ "${STAGE_DATA}" == "1" ]]; then
+  TRAIN_DATA="${JOB_TMPDIR}/astraguard-processed"
+  mkdir -p "${TRAIN_DATA}"
+  echo "Copying HDF5 data to PBS scratch..." | tee -a "${LIVE_LOG}"
+  cp "${PROCESSED_DIR}/train.h5" "${TRAIN_DATA}/"
+  cp "${PROCESSED_DIR}/val.h5" "${TRAIN_DATA}/"
+  cp "${PROCESSED_DIR}/stats.json" "${TRAIN_DATA}/"
+  cp "${PROCESSED_DIR}/manifest.json" "${TRAIN_DATA}/"
+fi
+
+echo "Training data: ${TRAIN_DATA}" | tee -a "${LIVE_LOG}"
+nvidia-smi | tee -a "${LIVE_LOG}"
+"${PYTHON_BIN}" -c \
+  'import torch; print("torch:", torch.__version__, "cuda:", torch.cuda.is_available())' \
+  2>&1 | tee -a "${LIVE_LOG}"
+
+cmd=(
+  "${PYTHON_BIN}" -m astraguard_landcover.train
+  --config "${CONFIG}"
+  --data-dir "${TRAIN_DATA}"
+  --output-dir "${OUTPUT_DIR}/${RUN_NAME}"
+)
+if [[ -f "${RESUME}" ]]; then
+  cmd+=(--resume "${RESUME}")
+  echo "Resuming: ${RESUME}" | tee -a "${LIVE_LOG}"
+fi
+
+printf 'Command:' | tee -a "${LIVE_LOG}"
+printf ' %q' "${cmd[@]}" | tee -a "${LIVE_LOG}"
+printf '\n' | tee -a "${LIVE_LOG}"
+"${cmd[@]}" 2>&1 | tee -a "${LIVE_LOG}"
+echo "Finished: $(date)" | tee -a "${LIVE_LOG}"
+

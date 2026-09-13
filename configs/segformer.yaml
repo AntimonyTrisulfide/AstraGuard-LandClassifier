@@ -1,0 +1,27 @@
+experiment_name: segformer_b0
+
+data:
+  processed_dir: data/processed
+  num_workers: 8
+  scale_divisor: 10000.0
+  augment: true
+
+model:
+  name: segformer
+  architecture: b0
+  checkpoint: nvidia/segformer-b0-finetuned-ade-512-512
+  pretrained: true
+  in_channels: 6
+  num_classes: 6
+
+training:
+  seed: 42
+  epochs: 60
+  batch_size: 12
+  learning_rate: 0.00006
+  weight_decay: 0.01
+  amp: true
+  ce_weight: 0.6
+  dice_weight: 0.4
+  early_stopping_patience: 10
+  output_dir: results/segformer_b0
