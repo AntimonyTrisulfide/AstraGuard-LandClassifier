@@ -5,8 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import math
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
 import numpy as np
 
@@ -16,6 +18,10 @@ from .utils import write_json
 STAC_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
 BAD_SCL_VALUES = (0, 1, 3, 8, 9, 10, 11)
 FLOAT32_FILL_VALUE = np.float32(np.nan)
+SAS_QUERY_KEYS = {
+    "se", "sig", "sip", "si", "skoid", "sks", "skt", "sktid", "ske",
+    "skv", "sp", "spr", "sr", "srt", "ss", "st", "sv",
+}
 
 
 def _utm_epsg(longitude: float, latitude: float) -> int:
@@ -65,6 +71,56 @@ def _select_monthly_scenes(items: list[Any], max_scenes: int) -> list[Any]:
     return sorted(selected, key=lambda item: str(item.properties.get("datetime", "")))
 
 
+def _remove_existing_sas(href: str) -> str:
+    """Remove a possibly expired Azure SAS while preserving unrelated parameters."""
+    parts = urlsplit(href)
+    if not parts.hostname or not parts.hostname.endswith(".blob.core.windows.net"):
+        return href
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    if not any(key in SAS_QUERY_KEYS for key, _ in query):
+        return href
+    retained = [(key, value) for key, value in query if key not in SAS_QUERY_KEYS]
+    return urlunsplit(parts._replace(query=urlencode(retained)))
+
+
+def _sign_selected_assets(
+    items: list[Any], asset_names: list[str], signer: Any
+) -> None:
+    """Re-sign selected STAC assets and fail early if the SAS is already stale."""
+    deadline = datetime.now(timezone.utc) + timedelta(minutes=10)
+    for item in items:
+        for name in asset_names:
+            if name not in item.assets:
+                raise RuntimeError(f"STAC item {item.id} has no {name} asset")
+            asset = item.assets[name]
+            unsigned_parts = urlsplit(_remove_existing_sas(asset.href))
+            bare_href = urlunsplit(unsigned_parts._replace(query=""))
+            signed_parts = urlsplit(signer(bare_href))
+            combined_query = "&".join(
+                part for part in (signed_parts.query, unsigned_parts.query) if part
+            )
+            fresh_href = urlunsplit(signed_parts._replace(query=combined_query))
+            expiry = parse_qs(urlsplit(fresh_href).query).get("se")
+            if expiry:
+                try:
+                    expires_at = datetime.fromisoformat(
+                        expiry[0].replace("Z", "+00:00")
+                    )
+                    if expires_at.tzinfo is None:
+                        raise ValueError("SAS expiry has no timezone")
+                except ValueError as exc:
+                    raise RuntimeError(
+                        f"Invalid Planetary Computer SAS expiry for {item.id}/{name}"
+                    ) from exc
+                if expires_at <= deadline:
+                    raise RuntimeError(
+                        f"Planetary Computer returned an expired or near-expiry "
+                        f"SAS for {item.id}/{name} (expires {expires_at.isoformat()}). "
+                        "Retry the CPU download job later; completed AOIs are kept."
+                    )
+            asset.href = fresh_href
+
+
 def download_region(
     *,
     region_id: str,
@@ -91,7 +147,7 @@ def download_region(
     if not (-180 <= west < east <= 180 and -90 <= south < north <= 90):
         raise ValueError("bbox must be west south east north in EPSG:4326")
     epsg = _utm_epsg((west + east) / 2.0, (south + north) / 2.0)
-    catalog = Client.open(STAC_URL, modifier=planetary_computer.sign_inplace)
+    catalog = Client.open(STAC_URL)
 
     sentinel_items = _query_items(
         catalog,
@@ -103,6 +159,9 @@ def download_region(
     sentinel_items = _select_monthly_scenes(sentinel_items, max_scenes)
     if not sentinel_items:
         raise RuntimeError("No Sentinel-2 scenes matched the AOI/date/cloud filters")
+    _sign_selected_assets(
+        sentinel_items, [*BAND_NAMES, "SCL"], planetary_computer.sign
+    )
 
     stack_arguments = {
         "epsg": epsg,
@@ -146,6 +205,7 @@ def download_region(
         raise RuntimeError(
             f"WorldCover STAC item has no 'map' asset. Available assets: {available}"
         )
+    _sign_selected_assets(worldcover_items, ["map"], planetary_computer.sign)
     worldcover = stackstac.stack(
         worldcover_items,
         assets=["map"],
