@@ -63,9 +63,51 @@ $HOME/.cache/astraguard-landcover
 
 The default [AOI manifest](configs/mp_aois.tsv) contains 26 training, five
 validation, and five held-out test regions. Each region covers `0.5° × 0.5°`;
-using the measured 37 MB for a `0.2° × 0.2°` pilot region, the expanded raw
-dataset is expected to occupy roughly 8–10 GB. The downloader prints cumulative
+the complete 36-AOI dataset occupied about 7 GiB on MANIT. The downloader prints cumulative
 usage after every AOI and stops before the configured 50 GiB limit.
+
+### Optional larger Madhya Pradesh dataset
+
+The separate [216-AOI manifest](configs/mp_aois_expanded.tsv) retains all 36
+default AOIs and adds 180 state-centered `0.5° × 0.5°` windows: 156 train,
+30 validation, and 30 test AOIs in total. Their split footprints do not
+overlap. The additional windows were generated against the
+[geoBoundaries India ADM1 boundary](https://www.geoboundaries.org/api/current/gbOpen/IND/ADM1/)
+(DataMeet India community / Election Commission of India, CC BY 2.5 IN); the
+reproducible generator is [scripts/generate_mp_expanded_manifest.py](scripts/generate_mp_expanded_manifest.py).
+
+At similar compression, 216 AOIs should be around 42 GiB, but file size is
+not guaranteed: the downloader's 50 GiB raw-data limit remains active. The
+windows overlap within a split, so the unique mapped area is about 3.3 times
+the baseline, not six times. This is still at Sentinel-2's native 10 m
+resolution.
+
+To download the extra AOIs in the CPU `long` queue while a **default** GPU
+job is queued, leave `configs/mp_aois.tsv` unchanged and submit:
+
+```bash
+cd "$HOME/AstraGuard-LandClassifier"
+AOI_MANIFEST=configs/mp_aois_expanded.tsv \
+DOWNLOAD_WALLTIME=48:00:00 \
+bash scripts/submit_setup_and_download.sh
+```
+
+Completed AOIs are skipped, so the first 36 do not download again. The
+already-queued default GPU job continues to use the original 36-AOI manifest;
+it will **not** automatically switch to the expanded data. After the CPU job
+prints `All 216 AOIs are complete`, submit a separate GPU experiment:
+
+```bash
+AOI_MANIFEST=configs/mp_aois_expanded.tsv \
+RUN_NAME=deeplabv3plus_mp216_v1 \
+GPU_QUEUE=dgx \
+bash scripts/submit_pipeline.sh
+```
+
+Use `GPU_QUEUE=max_dgx` if preferred. The expanded preprocessing/HDF5 scratch
+usage and 60-epoch training time may exceed the current 24-hour GPU request;
+use the 36-AOI run as a benchmark before requesting or launching a full
+expanded run.
 
 ### Second command: preprocess, train, and evaluate
 
