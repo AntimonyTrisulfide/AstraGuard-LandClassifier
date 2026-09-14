@@ -87,7 +87,6 @@ def _sign_selected_assets(
     items: list[Any], asset_names: list[str], signer: Any
 ) -> None:
     """Re-sign selected STAC assets and fail early if the SAS is already stale."""
-    deadline = datetime.now(timezone.utc) + timedelta(minutes=10)
     for item in items:
         for name in asset_names:
             if name not in item.assets:
@@ -112,7 +111,10 @@ def _sign_selected_assets(
                     raise RuntimeError(
                         f"Invalid Planetary Computer SAS expiry for {item.id}/{name}"
                     ) from exc
-                if expires_at <= deadline:
+                # The Planetary Computer SDK refreshes cached SAS tokens once
+                # less than a minute remains; a 10-minute cutoff rejects its
+                # otherwise valid cached tokens during longer download jobs.
+                if expires_at <= datetime.now(timezone.utc) + timedelta(seconds=60):
                     raise RuntimeError(
                         f"Planetary Computer returned an expired or near-expiry "
                         f"SAS for {item.id}/{name} (expires {expires_at.isoformat()}). "

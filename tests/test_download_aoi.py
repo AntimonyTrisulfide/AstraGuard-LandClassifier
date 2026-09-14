@@ -83,6 +83,35 @@ class StackstacContractTest(unittest.TestCase):
                 lambda unsigned: f"{unsigned}?se=2026-09-13T21%3A43%3A18Z&sig=old",
             )
 
+    def test_valid_cached_sas_with_five_minutes_remaining_is_accepted(self) -> None:
+        href = "https://example.blob.core.windows.net/data/image.tif"
+        item = SimpleNamespace(
+            id="example-item", assets={"B04": SimpleNamespace(href=href)}
+        )
+        expiry = quote(
+            (datetime.now(timezone.utc) + timedelta(minutes=5))
+            .strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
+        _sign_selected_assets(
+            [item], ["B04"], lambda unsigned: f"{unsigned}?se={expiry}&sig=new"
+        )
+        self.assertIn("sig=new", item.assets["B04"].href)
+
+    def test_sas_expiring_within_a_minute_is_rejected(self) -> None:
+        href = "https://example.blob.core.windows.net/data/image.tif"
+        item = SimpleNamespace(
+            id="example-item", assets={"B04": SimpleNamespace(href=href)}
+        )
+        expiry = quote(
+            (datetime.now(timezone.utc) + timedelta(seconds=30))
+            .strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
+        with self.assertRaisesRegex(RuntimeError, "expired or near-expiry"):
+            _sign_selected_assets(
+                [item], ["B04"],
+                lambda unsigned: f"{unsigned}?se={expiry}&sig=new",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
