@@ -19,10 +19,11 @@ TILE_SIZE="${TILE_SIZE:-256}"
 STRIDE="${STRIDE:-256}"
 MIN_VALID_FRACTION="${MIN_VALID_FRACTION:-0.95}"
 GPU_QUEUE="${GPU_QUEUE:-dgx}"
-GPU_HOST="${GPU_HOST:-}"
+GPU_HOST="${GPU_HOST:-gpu2}"
 GPU_NCPUS="${GPU_NCPUS:-12}"
 GPU_MEM="${GPU_MEM:-24gb}"
 GPU_WALLTIME="${GPU_WALLTIME:-24:00:00}"
+GPU_AFTER_JOB_ID="${GPU_AFTER_JOB_ID:-}"
 AOI_MANIFEST="${AOI_MANIFEST:-configs/mp_aois.tsv}"
 
 if [[ "${AOI_MANIFEST}" != /* ]]; then
@@ -44,10 +45,22 @@ if [[ ! "${GPU_NCPUS}" =~ ^[1-9][0-9]*$ ]]; then
   echo "GPU_NCPUS must be a positive integer." >&2
   exit 2
 fi
+if [[ -n "${GPU_AFTER_JOB_ID}" && ! "${GPU_AFTER_JOB_ID}" =~ ^[0-9]+([.][A-Za-z0-9._-]+)?$ ]]; then
+  echo "Invalid GPU_AFTER_JOB_ID '${GPU_AFTER_JOB_ID}'." >&2
+  exit 2
+fi
 
 SELECT_RESOURCE="select=1:ncpus=${GPU_NCPUS}:mem=${GPU_MEM}:ngpus=1"
 if [[ -n "${GPU_HOST}" ]]; then
   SELECT_RESOURCE+=":host=${GPU_HOST}"
+fi
+QSUB_DEPENDENCY=()
+if [[ -n "${GPU_AFTER_JOB_ID}" ]]; then
+  if ! qstat "${GPU_AFTER_JOB_ID}" >/dev/null 2>&1; then
+    echo "Dependency job is not active: ${GPU_AFTER_JOB_ID}" >&2
+    exit 2
+  fi
+  QSUB_DEPENDENCY=(-W "depend=afterany:${GPU_AFTER_JOB_ID}")
 fi
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
@@ -73,6 +86,7 @@ cd "${PROJECT_ROOT}"
 qsub -q "${GPU_QUEUE}" \
   -l "${SELECT_RESOURCE}" \
   -l "walltime=${GPU_WALLTIME}" \
+  "${QSUB_DEPENDENCY[@]}" \
   -v \
 PYTHON_BIN="${PYTHON_BIN}",\
 DATA_ROOT="${DATA_ROOT}",\

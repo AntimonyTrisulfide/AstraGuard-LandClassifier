@@ -121,8 +121,13 @@ bash scripts/submit_pipeline.sh
 # Or select max_dgx
 GPU_QUEUE=max_dgx bash scripts/submit_pipeline.sh
 
-# Optionally target a specific healthy GPU host.
-GPU_HOST=gpu1 GPU_QUEUE=dgx bash scripts/submit_pipeline.sh
+# The MANIT launcher defaults to gpu2. Override GPU_HOST only if another
+# GPU node has been verified as healthy.
+GPU_QUEUE=dgx bash scripts/submit_pipeline.sh
+
+# Wait until an active job occupying the selected host has ended.
+GPU_HOST=gpu2 GPU_AFTER_JOB_ID=35905.hpc.local \
+GPU_MEM=24gb GPU_QUEUE=dgx bash scripts/submit_pipeline.sh
 ```
 
 Submit only one of the two commands. PBS returns a job ID and leaves it queued

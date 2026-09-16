@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-${ASTRAGUARD_VENV:-$HOME/.conda/envs/astraguard-landcover}/bin/python}"
 GPU_QUEUE="${GPU_QUEUE:-dgx}"
-GPU_HOST="${GPU_HOST:-}"
+GPU_HOST="${GPU_HOST:-gpu2}"
 
 case "${GPU_QUEUE}" in
   dgx|max_dgx) ;;
