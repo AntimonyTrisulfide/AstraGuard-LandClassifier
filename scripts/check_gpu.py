@@ -27,13 +27,18 @@ def main() -> None:
         config = yaml.safe_load(handle)
     model_config = config["model"]
     channels = int(model_config["in_channels"])
+    batch_size = int(config["training"].get("batch_size", 16))
     model = build_model(model_config, initialize_pretrained=False).cuda().train()
-    inputs = torch.randn(1, channels, 256, 256, device="cuda")
+    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
+    inputs = torch.randn(batch_size, channels, 256, 256, device="cuda")
 
+    torch.cuda.reset_peak_memory_stats()
+    optimizer.zero_grad(set_to_none=True)
     with torch.autocast(device_type="cuda", dtype=torch.float16):
         logits = model(inputs)
         loss = logits.float().square().mean()
     loss.backward()
+    optimizer.step()
     torch.cuda.synchronize()
 
     print(
@@ -45,6 +50,10 @@ def main() -> None:
                 "gpu_count": torch.cuda.device_count(),
                 "device": torch.cuda.get_device_name(0),
                 "model": model_config["name"],
+                "batch_size": batch_size,
+                "peak_gpu_memory_gib": round(
+                    torch.cuda.max_memory_allocated() / 1024**3, 2
+                ),
                 "amp_forward_backward": "ok",
             },
             indent=2,
