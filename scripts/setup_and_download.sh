@@ -13,7 +13,7 @@ RAW_DIR="${RAW_DIR:-${DATA_ROOT}/raw}"
 CACHE_DIR="${CACHE_DIR:-$HOME/.cache/astraguard-landcover}"
 PYTHON_BIN="${PYTHON_BIN:-$HOME/.conda/envs/astraguard-landcover/bin/python}"
 BOOTSTRAP_ENV="${BOOTSTRAP_ENV:-1}"
-BOOTSTRAP_MARKER="${CACHE_DIR}/setup_complete_v1"
+BOOTSTRAP_MARKER="${CACHE_DIR}/setup_complete_v2"
 AOI_MANIFEST="${AOI_MANIFEST:-configs/mp_aois.tsv}"
 MAX_RAW_GB="${MAX_RAW_GB:-50}"
 SENTINEL_MAX_SCENES="${SENTINEL_MAX_SCENES:-12}"
@@ -39,7 +39,9 @@ environment_ready() {
     && "${PYTHON_BIN}" -c \
     'from importlib.metadata import version
 import astraguard_landcover, h5py, planetary_computer, rasterio, rioxarray, stackstac
-assert version("transformers") == "4.48.3"' \
+assert version("transformers") == "4.48.3"
+assert version("torch") == "2.6.0+cu118"
+assert version("torchvision") == "0.21.0+cu118"' \
     >/dev/null 2>&1
 }
 

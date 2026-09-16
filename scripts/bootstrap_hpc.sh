@@ -9,7 +9,7 @@ PREFETCH_MODELS="${PREFETCH_MODELS:-1}"
 ENV_PREFIX="${ENV_PREFIX:-$HOME/.conda/envs/${ENV_NAME}}"
 PYTHON_BIN="${PYTHON_BIN:-${ENV_PREFIX}/bin/python}"
 CONDA_EXE="${CONDA_EXE:-$(command -v conda || true)}"
-BOOTSTRAP_MARKER="${CACHE_DIR}/setup_complete_v1"
+BOOTSTRAP_MARKER="${CACHE_DIR}/setup_complete_v2"
 
 mkdir -p "${CACHE_DIR}"
 rm -f "${BOOTSTRAP_MARKER}"
@@ -33,6 +33,20 @@ fi
   "h5py==3.10.0" \
   "rasterio==1.3.10" \
   "contourpy==1.2.1"
+# The MANIT dgx node currently exposes NVIDIA driver 460.32.03. PyTorch's
+# CUDA 12.4 wheel cannot initialize on that driver, so use the CUDA 11.8
+# build explicitly. Exact local-version pins prevent an installed +cu124
+# wheel from satisfying the requirement accidentally.
+if ! "${PYTHON_BIN}" -c \
+  'import torch, torchvision
+assert torch.__version__ == "2.6.0+cu118"
+assert torchvision.__version__ == "0.21.0+cu118"' \
+  >/dev/null 2>&1; then
+  "${PYTHON_BIN}" -m pip install --only-binary=:all: --upgrade --force-reinstall \
+    --index-url https://download.pytorch.org/whl/cu118 \
+    "torch==2.6.0+cu118" \
+    "torchvision==0.21.0+cu118"
+fi
 # Compute nodes do not provide a build toolchain. Restrict every third-party
 # dependency to wheels so pip can select an older compatible binary instead of
 # repeatedly attempting source builds.

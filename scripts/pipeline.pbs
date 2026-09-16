@@ -69,8 +69,7 @@ export TOKENIZERS_PARALLELISM=false
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-12}"
 
 nvidia-smi
-"${PYTHON_BIN}" -c \
-  'import torch; print("torch:", torch.__version__, "cuda:", torch.cuda.is_available(), "gpus:", torch.cuda.device_count())'
+"${PYTHON_BIN}" scripts/check_gpu.py --config "${CONFIG}"
 
 echo
 echo "Stage 1/3: preprocessing raw rasters into PBS scratch"
