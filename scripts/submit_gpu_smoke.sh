@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-${ASTRAGUARD_VENV:-$HOME/.conda/envs/astraguard-landcover}/bin/python}"
 GPU_QUEUE="${GPU_QUEUE:-dgx}"
+GPU_HOST="${GPU_HOST:-}"
 
 case "${GPU_QUEUE}" in
   dgx|max_dgx) ;;
@@ -14,6 +15,15 @@ case "${GPU_QUEUE}" in
     exit 2
     ;;
 esac
+if [[ -n "${GPU_HOST}" && ! "${GPU_HOST}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "Invalid GPU_HOST '${GPU_HOST}'." >&2
+  exit 2
+fi
+
+SELECT_RESOURCE="select=1:ncpus=4:mem=16gb:ngpus=1"
+if [[ -n "${GPU_HOST}" ]]; then
+  SELECT_RESOURCE+=":host=${GPU_HOST}"
+fi
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
   echo "Python executable does not exist: ${PYTHON_BIN}" >&2
@@ -21,4 +31,8 @@ if [[ ! -x "${PYTHON_BIN}" ]]; then
 fi
 
 cd "${PROJECT_ROOT}"
-qsub -q "${GPU_QUEUE}" -v PYTHON_BIN="${PYTHON_BIN}" "${PROJECT_ROOT}/scripts/gpu_smoke.pbs"
+qsub -q "${GPU_QUEUE}" \
+  -l "${SELECT_RESOURCE}" \
+  -l walltime=00:15:00 \
+  -v PYTHON_BIN="${PYTHON_BIN}" \
+  "${PROJECT_ROOT}/scripts/gpu_smoke.pbs"

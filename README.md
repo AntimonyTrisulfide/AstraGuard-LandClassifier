@@ -120,6 +120,9 @@ bash scripts/submit_pipeline.sh
 
 # Or select max_dgx
 GPU_QUEUE=max_dgx bash scripts/submit_pipeline.sh
+
+# Optionally target a specific healthy GPU host.
+GPU_HOST=gpu1 GPU_QUEUE=dgx bash scripts/submit_pipeline.sh
 ```
 
 Submit only one of the two commands. PBS returns a job ID and leaves it queued
@@ -214,7 +217,7 @@ The pipeline follows the working MANIT/AudioPrism2.0 convention:
 
 ```bash
 #PBS -q dgx
-#PBS -l select=1:ncpus=12:mem=64gb:ngpus=1
+#PBS -l select=1:ncpus=12:mem=24gb:ngpus=1
 #PBS -l walltime=24:00:00
 #PBS -j oe
 ```

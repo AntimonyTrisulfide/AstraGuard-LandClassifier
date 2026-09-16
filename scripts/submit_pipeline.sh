@@ -19,6 +19,10 @@ TILE_SIZE="${TILE_SIZE:-256}"
 STRIDE="${STRIDE:-256}"
 MIN_VALID_FRACTION="${MIN_VALID_FRACTION:-0.95}"
 GPU_QUEUE="${GPU_QUEUE:-dgx}"
+GPU_HOST="${GPU_HOST:-}"
+GPU_NCPUS="${GPU_NCPUS:-12}"
+GPU_MEM="${GPU_MEM:-24gb}"
+GPU_WALLTIME="${GPU_WALLTIME:-24:00:00}"
 AOI_MANIFEST="${AOI_MANIFEST:-configs/mp_aois.tsv}"
 
 if [[ "${AOI_MANIFEST}" != /* ]]; then
@@ -32,6 +36,19 @@ case "${GPU_QUEUE}" in
     exit 2
     ;;
 esac
+if [[ -n "${GPU_HOST}" && ! "${GPU_HOST}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "Invalid GPU_HOST '${GPU_HOST}'." >&2
+  exit 2
+fi
+if [[ ! "${GPU_NCPUS}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "GPU_NCPUS must be a positive integer." >&2
+  exit 2
+fi
+
+SELECT_RESOURCE="select=1:ncpus=${GPU_NCPUS}:mem=${GPU_MEM}:ngpus=1"
+if [[ -n "${GPU_HOST}" ]]; then
+  SELECT_RESOURCE+=":host=${GPU_HOST}"
+fi
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
   echo "Python environment is missing: ${PYTHON_BIN}" >&2
@@ -53,7 +70,10 @@ fi
 mkdir -p "${OUTPUT_DIR}/${RUN_NAME}/logs" "${CACHE_DIR}"
 cd "${PROJECT_ROOT}"
 
-qsub -q "${GPU_QUEUE}" -v \
+qsub -q "${GPU_QUEUE}" \
+  -l "${SELECT_RESOURCE}" \
+  -l "walltime=${GPU_WALLTIME}" \
+  -v \
 PYTHON_BIN="${PYTHON_BIN}",\
 DATA_ROOT="${DATA_ROOT}",\
 RAW_DIR="${RAW_DIR}",\
