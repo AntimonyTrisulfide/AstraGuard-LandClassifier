@@ -1,5 +1,6 @@
 .venv/
 __pycache__/
+.midterm_build/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
