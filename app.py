@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import tempfile
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -35,23 +34,25 @@ def render_mask(mask: np.ndarray) -> np.ndarray:
 
 
 def run_inference(checkpoint: Path, uploaded, server_input: Path | None, tile_size: int, overlap: int, batch_size: int):
-    with tempfile.TemporaryDirectory(prefix="astraguard_demo_") as tmp:
-        tmp_path = Path(tmp)
-        input_path = server_input
-        if uploaded is not None:
-            input_path = tmp_path / uploaded.name
-            input_path.write_bytes(uploaded.getvalue())
-        output_path = tmp_path / "prediction.tif"
-        if input_path is None or not input_path.is_file():
-            raise FileNotFoundError("Choose an uploaded GeoTIFF or a valid server-side GeoTIFF path.")
-        result = predict_raster(
-            checkpoint_path=checkpoint, input_path=input_path, output_path=output_path,
-            tile_size=tile_size, overlap=overlap, batch_size=batch_size, max_pixels=50_000_000,
-        )
-        with rasterio.open(input_path) as source:
-            source_data = source.read()
-        with rasterio.open(output_path) as prediction:
-            mask = prediction.read(1)
+    # Keep intermediate GeoTIFFs in the repository: some Windows security
+    # policies prevent Rasterio from creating files under the system TEMP dir.
+    tmp_path = Path(__file__).resolve().parent / ".demo_runtime"
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    input_path = server_input
+    if uploaded is not None:
+        input_path = tmp_path / uploaded.name
+        input_path.write_bytes(uploaded.getvalue())
+    output_path = tmp_path / "prediction.tif"
+    if input_path is None or not input_path.is_file():
+        raise FileNotFoundError("Choose an uploaded GeoTIFF or a valid server-side GeoTIFF path.")
+    result = predict_raster(
+        checkpoint_path=checkpoint, input_path=input_path, output_path=output_path,
+        tile_size=tile_size, overlap=overlap, batch_size=batch_size, max_pixels=50_000_000,
+    )
+    with rasterio.open(input_path) as source:
+        source_data = source.read()
+    with rasterio.open(output_path) as prediction:
+        mask = prediction.read(1)
     return source_data, mask, result
 
 
