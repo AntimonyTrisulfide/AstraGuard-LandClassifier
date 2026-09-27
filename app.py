@@ -34,12 +34,16 @@ def render_mask(mask: np.ndarray) -> np.ndarray:
     return rendered
 
 
-def run_inference(checkpoint: Path, uploaded, tile_size: int, overlap: int, batch_size: int):
+def run_inference(checkpoint: Path, uploaded, server_input: Path | None, tile_size: int, overlap: int, batch_size: int):
     with tempfile.TemporaryDirectory(prefix="astraguard_demo_") as tmp:
         tmp_path = Path(tmp)
-        input_path = tmp_path / uploaded.name
+        input_path = server_input
+        if uploaded is not None:
+            input_path = tmp_path / uploaded.name
+            input_path.write_bytes(uploaded.getvalue())
         output_path = tmp_path / "prediction.tif"
-        input_path.write_bytes(uploaded.getvalue())
+        if input_path is None or not input_path.is_file():
+            raise FileNotFoundError("Choose an uploaded GeoTIFF or a valid server-side GeoTIFF path.")
         result = predict_raster(
             checkpoint_path=checkpoint, input_path=input_path, output_path=output_path,
             tile_size=tile_size, overlap=overlap, batch_size=batch_size, max_pixels=50_000_000,
@@ -68,8 +72,14 @@ with st.sidebar:
     st.code("B02 B03 B04 B08 B11 B12")
 
 uploaded = st.file_uploader("Upload a six-band Sentinel-2 GeoTIFF", type=["tif", "tiff"])
-if not uploaded:
-    st.info("Upload a small GeoTIFF tile to run the trained model.")
+server_input_text = st.text_input(
+    "Or use a server-side GeoTIFF path",
+    value=os.environ.get("ASTRAGUARD_DEMO_INPUT", ""),
+    help="Useful on HPC when the raw AOI already exists on the shared filesystem.",
+)
+server_input = Path(server_input_text).expanduser() if server_input_text else None
+if not uploaded and server_input is None:
+    st.info("Upload a small GeoTIFF tile or enter a server-side GeoTIFF path.")
     st.stop()
 
 checkpoint = Path(checkpoint_text).expanduser()
@@ -79,7 +89,7 @@ if not checkpoint.is_file():
 
 with st.spinner("Running sliding-window segmentation..."):
     try:
-        source_data, mask, result = run_inference(checkpoint, uploaded, tile_size, overlap, batch_size)
+        source_data, mask, result = run_inference(checkpoint, uploaded, server_input, tile_size, overlap, batch_size)
     except Exception as exc:
         st.exception(exc)
         st.stop()
@@ -103,7 +113,8 @@ for column, class_name in zip(cols, CLASS_NAMES):
             st.caption(f"{details['area_km2']:.2f} km²")
 
 valid_pixels = int(np.sum(mask != IGNORE_INDEX))
-st.caption(f"Input: {uploaded.name} | Valid pixels: {valid_pixels:,} | CRS: {result.get('crs') or 'not available'}")
+input_label = uploaded.name if uploaded is not None else str(server_input)
+st.caption(f"Input: {input_label} | Valid pixels: {valid_pixels:,} | CRS: {result.get('crs') or 'not available'}")
 fig, ax = plt.subplots(figsize=(9, 1.2))
 ax.barh(CLASS_NAMES, [result["classes"][name]["pixels"] for name in CLASS_NAMES], color=COLOR_MAP / 255.0)
 ax.set_xlabel("Pixels")
