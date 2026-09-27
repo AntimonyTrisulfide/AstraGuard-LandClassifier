@@ -143,6 +143,28 @@ queue except `dgx` and `max_dgx`. Inside that one allocation,
 The HDF5 files disappear with PBS scratch after the job. Raw GeoTIFFs never go
 into scratch permanently and can regenerate the processed dataset on any rerun.
 
+## Live model demo
+
+`app.py` provides a small Streamlit frontend for demonstrating `best.pt`. It
+accepts a six-band GeoTIFF in the order `B02 B03 B04 B08 B11 B12`, runs the
+existing sliding-window predictor, and displays an RGB preview, predicted mask,
+and class-area summary.
+
+On the HPC node where the environment is installed:
+
+```bash
+cd "$HOME/AstraGuard-LandClassifier"
+"$PYTHON_BIN" -m pip install -r requirements-demo.txt
+export ASTRAGUARD_CHECKPOINT="$HOME/AstraGuard-LandClassifier-data/runs/deeplabv3plus_v1/best.pt"
+streamlit run app.py --server.address 0.0.0.0 --server.port 8501
+```
+
+From your laptop, create an SSH tunnel and open `http://localhost:8501`:
+
+```bash
+ssh -N -L 8501:localhost:8501 2311401159@hpc.manit.ac.in
+```
+
 Monitor the job:
 
 ```bash

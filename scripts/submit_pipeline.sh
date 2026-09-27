@@ -54,13 +54,17 @@ SELECT_RESOURCE="select=1:ncpus=${GPU_NCPUS}:mem=${GPU_MEM}:ngpus=1"
 if [[ -n "${GPU_HOST}" ]]; then
   SELECT_RESOURCE+=":host=${GPU_HOST}"
 fi
-QSUB_DEPENDENCY=()
+QSUB_ARGS=(
+  -q "${GPU_QUEUE}"
+  -l "${SELECT_RESOURCE}"
+  -l "walltime=${GPU_WALLTIME}"
+)
 if [[ -n "${GPU_AFTER_JOB_ID}" ]]; then
   if ! qstat "${GPU_AFTER_JOB_ID}" >/dev/null 2>&1; then
     echo "Dependency job is not active: ${GPU_AFTER_JOB_ID}" >&2
     exit 2
   fi
-  QSUB_DEPENDENCY=(-W "depend=afterany:${GPU_AFTER_JOB_ID}")
+  QSUB_ARGS+=(-W "depend=afterany:${GPU_AFTER_JOB_ID}")
 fi
 
 if [[ ! -x "${PYTHON_BIN}" ]]; then
@@ -83,10 +87,7 @@ fi
 mkdir -p "${OUTPUT_DIR}/${RUN_NAME}/logs" "${CACHE_DIR}"
 cd "${PROJECT_ROOT}"
 
-qsub -q "${GPU_QUEUE}" \
-  -l "${SELECT_RESOURCE}" \
-  -l "walltime=${GPU_WALLTIME}" \
-  "${QSUB_DEPENDENCY[@]}" \
+qsub "${QSUB_ARGS[@]}" \
   -v \
 PYTHON_BIN="${PYTHON_BIN}",\
 DATA_ROOT="${DATA_ROOT}",\
